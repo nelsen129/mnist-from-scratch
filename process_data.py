@@ -5,6 +5,8 @@ import os
 import requests
 import shutil
 
+from tqdm import tqdm
+
 LABEL_MAGIC_NUM = 2049
 IMAGE_MAGIC_NUM = 2051
 
@@ -37,9 +39,9 @@ def load_labels(path):
     with open(path, 'rb') as label_file:
         assert int.from_bytes(label_file.read(4), 'big') == LABEL_MAGIC_NUM
         num_labels = int.from_bytes(label_file.read(4), 'big')
-        for i in range(num_labels):
+        for _ in tqdm(range(num_labels)):
             labels.append(int.from_bytes(label_file.read(1), 'big'))
-    return np.array(labels)
+    return np.array(labels, dtype=np.uint8)
 
 
 def load_images(path):
@@ -49,15 +51,16 @@ def load_images(path):
         num_images = int.from_bytes(label_file.read(4), 'big')
         num_rows = int.from_bytes(label_file.read(4), 'big')
         num_cols = int.from_bytes(label_file.read(4), 'big')
-        for i in range(num_images):
-            image = []
+        for _ in tqdm(range(num_images)):
+            image_pixels = []
             for row in range(num_rows):
                 row_pixels = []
                 for col in range(num_cols):
                     row_pixels.append(int.from_bytes(label_file.read(1), 'big'))
-                image.append(row_pixels)
-            images.append(image)
-    return np.array(images)
+                image_pixels.append(row_pixels)
+            images.append(image_pixels)
+    return np.array(images, dtype=np.uint8)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -77,7 +80,17 @@ if __name__ == '__main__':
     extract_data(data_dir)
     print('Data extracted!')
 
+    print('Loading data...')
     train_labels = load_labels(os.path.join(data_dir, 'extracted', train_label_url.split('/')[-1]))
-    print(train_labels[:20])
     train_images = load_images(os.path.join(data_dir, 'extracted', train_image_url.split('/')[-1]))
-    print(train_images.shape, train_images[0])
+    test_labels = load_labels(os.path.join(data_dir, 'extracted', test_label_url.split('/')[-1]))
+    test_images = load_images(os.path.join(data_dir, 'extracted', test_image_url.split('/')[-1]))
+    print('Data loaded!')
+
+    print('Saving data...')
+    os.makedirs(os.path.join(data_dir, 'processed'), exist_ok=True)
+    np.save(os.path.join(data_dir, 'processed', 'train_labels.npy'), train_labels)
+    np.save(os.path.join(data_dir, 'processed', 'train_images.npy'), train_images)
+    np.save(os.path.join(data_dir, 'processed', 'test_labels.npy'), test_labels)
+    np.save(os.path.join(data_dir, 'processed', 'test_images.npy'), test_images)
+    print('Data saved!')

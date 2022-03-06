@@ -4,7 +4,7 @@ Project to create a neural network to classify handwritten digits from MNIST fro
 
 TODO:
 - [x] Data loading
-- [ ] Base model
+- [x] Base model
 - [ ] Backpropagation
 - [ ] Training loop
 - [ ] Finetuning

@@ -57,11 +57,18 @@ class NeuralNetworkModel:
         self.optimizer_step(logits, labels)
         return y
 
-    def fit(self, inputs, labels, epochs=1, batch_size=64, shuffle=True):
+    def test_step(self, inputs):
+        y, logits = self.forward_pass(inputs)
+        return y
+
+    def fit(self, inputs, labels, test_inputs, test_labels, epochs=1, batch_size=64, shuffle=True):
         train_x = inputs
         train_y = labels
+        test_x = test_inputs
+        test_y = test_labels
 
-        history = {'losses': [], 'metrics': []}
+        history = {'losses': [], 'metrics': [], 'val_losses': [], 'val_metrics': []}
+
         for epoch in range(epochs):
             print(f'Epoch {epoch}:')
 
@@ -82,10 +89,25 @@ class NeuralNetworkModel:
             loss = np.concatenate(loss).mean()
             metric = np.array(metric).sum() / len(inputs)
 
-            print(f'Loss: {loss}, Metric: {metric}')
+            print(f'Loss: {loss}, Metric: {metric}', end='; ')
+
+            val_loss = []
+            val_metric = []
+            for batch in range(ceil(len(test_inputs) / batch_size)):
+                batch_x = test_x[batch*batch_size:(batch+1)*batch_size]
+                batch_y = test_y[batch*batch_size:(batch+1)*batch_size]
+                batch_y_pred = self.test_step(batch_x)
+                val_loss.append(metrics.mse(batch_y, batch_y_pred))
+                val_metric.append(metrics.categorical_acc(batch_y, batch_y_pred))
+
+            val_loss = np.concatenate(val_loss).mean()
+            val_metric = np.array(val_metric).sum() / len(test_inputs)
+
+            print(f'Val Loss: {val_loss}, Metric: {val_metric}')
 
             history['losses'].append(loss)
             history['metrics'].append(metric)
-            self.learning_rate *= 0.8
+            history['val_losses'].append(val_loss)
+            history['val_metrics'].append(val_metric)
 
         return history

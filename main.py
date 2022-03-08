@@ -37,6 +37,6 @@ if __name__ == '__main__':
 
     train_x, train_y, test_x, test_y = load_data(data_dir)
 
-    nn_model = model.NeuralNetworkModel(layers=3, learning_rate=1e0, activation='sigmoid', channels=128)
-    history = nn_model.fit(train_x, train_y, epochs=10, shuffle=False, batch_size=2048)
+    nn_model = model.NeuralNetworkModel(layers=3, learning_rate=6e-1, activation='sigmoid', channels=16)
+    history = nn_model.fit(train_x, train_y, test_x, test_y, epochs=30, shuffle=True, batch_size=64)
     print('hi')

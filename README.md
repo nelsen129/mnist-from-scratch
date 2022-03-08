@@ -6,5 +6,5 @@ TODO:
 - [x] Data loading
 - [x] Base model
 - [x] Backpropagation
-- [ ] Training loop
+- [x] Training loop
 - [ ] Finetuning

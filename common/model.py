@@ -8,13 +8,12 @@ rng = np.random.default_rng(12345)
 
 
 class NeuralNetworkModel:
-    def __init__(self, in_features=784, out_features=10, layers=3, channels=16, activation='relu', learning_rate=1e-4):
+    def __init__(self, in_features=784, out_features=10, layers=3, channels=16, activation='sigmoid'):
         self.in_features = in_features
         self.out_features = out_features
         self.num_layers = layers
         self.channels = channels
         self.activation = activation
-        self.learning_rate = learning_rate
 
         self.layers = []
         for layer in range(layers):
@@ -31,7 +30,7 @@ class NeuralNetworkModel:
             logits.append(x)
         return x, logits
 
-    def get_gradient(self, logits, labels):
+    def _get_gradient(self, logits, labels):
         pred = logits[-1]
         true = labels
         d_a = metrics.d_mse(true, pred)
@@ -47,25 +46,27 @@ class NeuralNetworkModel:
             d_a = np.matmul(layer[:-1], (d_a * d_z)[:, :, np.newaxis])[:, :, 0]
         return gradient_vector
 
-    def optimizer_step(self, logits, labels):
-        gv = self.get_gradient(logits, labels)
+    def _optimizer_step(self, logits, labels):
+        gv = self._get_gradient(logits, labels)
         for layer, gradient in zip(self.layers, gv):
             layer -= gradient.mean(axis=0) * self.learning_rate
 
-    def train_step(self, inputs, labels):
+    def _train_step(self, inputs, labels):
         y, logits = self.forward_pass(inputs)
-        self.optimizer_step(logits, labels)
+        self._optimizer_step(logits, labels)
         return y
 
-    def test_step(self, inputs):
+    def _test_step(self, inputs):
         y, logits = self.forward_pass(inputs)
         return y
 
-    def fit(self, inputs, labels, test_inputs, test_labels, epochs=1, batch_size=64, shuffle=True):
+    def fit(self, inputs, labels, test_inputs, test_labels, epochs=1, batch_size=64, shuffle=True, learning_rate=6e-1):
         train_x = inputs
         train_y = labels
         test_x = test_inputs
         test_y = test_labels
+
+        self.learning_rate = learning_rate
 
         history = {'losses': [], 'metrics': [], 'val_losses': [], 'val_metrics': []}
 
@@ -82,7 +83,7 @@ class NeuralNetworkModel:
             for batch in tqdm(range(ceil(len(inputs) / batch_size))):
                 batch_x = train_x[batch*batch_size:(batch+1)*batch_size]
                 batch_y = train_y[batch*batch_size:(batch+1)*batch_size]
-                batch_y_pred = self.train_step(batch_x, batch_y)
+                batch_y_pred = self._train_step(batch_x, batch_y)
                 loss.append(metrics.mse(batch_y, batch_y_pred))
                 metric.append(metrics.categorical_acc(batch_y, batch_y_pred))
 
@@ -96,14 +97,14 @@ class NeuralNetworkModel:
             for batch in range(ceil(len(test_inputs) / batch_size)):
                 batch_x = test_x[batch*batch_size:(batch+1)*batch_size]
                 batch_y = test_y[batch*batch_size:(batch+1)*batch_size]
-                batch_y_pred = self.test_step(batch_x)
+                batch_y_pred = self._test_step(batch_x)
                 val_loss.append(metrics.mse(batch_y, batch_y_pred))
                 val_metric.append(metrics.categorical_acc(batch_y, batch_y_pred))
 
             val_loss = np.concatenate(val_loss).mean()
             val_metric = np.array(val_metric).sum() / len(test_inputs)
 
-            print(f'Val Loss: {val_loss}, Metric: {val_metric}')
+            print(f'Val Loss: {val_loss}, Metric: {val_metric}\n')
 
             history['losses'].append(loss)
             history['metrics'].append(metric)

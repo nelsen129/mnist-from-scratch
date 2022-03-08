@@ -31,12 +31,33 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data', type=str, default='data', help='Directory for the data to be loaded from.')
+    parser.add_argument('--layers', type=int, default=3, help='Number of layers in model, not including input layer')
+    parser.add_argument('--channels', type=int, default=16, help='Number of channels in hidden layers')
+    parser.add_argument('--in-features', type=int, default=784, help='Number of pixels per image. Should stay as 784')
+    parser.add_argument('--out-features', type=int, default=10, help='Number of outputs to predict. Should stay as 10')
+    parser.add_argument('--activation', default='sigmoid', choices=['sigmoid', 'relu', 'linear'],
+                        help='Activation to use after each layer')
+    parser.add_argument('--learning-rate', type=float, default=6e-1, help='Learning rate for SGD')
+    parser.add_argument('--batch', type=int, default=64, help='Batch size for training')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs to train for')
 
     args = parser.parse_args()
     data_dir = args.data
+    layers = args.layers
+    channels = args.channels
+    in_features = args.in_features
+    out_features = args.out_features
+    activation = args.activation
+    learning_rate = args.learning_rate
+    batch = args.batch
+    epochs = args.epochs
 
     train_x, train_y, test_x, test_y = load_data(data_dir)
 
-    nn_model = model.NeuralNetworkModel(layers=3, learning_rate=6e-1, activation='sigmoid', channels=16)
-    history = nn_model.fit(train_x, train_y, test_x, test_y, epochs=30, shuffle=True, batch_size=64)
-    print('hi')
+    nn_model = model.NeuralNetworkModel(in_features=in_features, out_features=out_features, layers=layers,
+                                        channels=channels, activation=activation)
+    history = nn_model.fit(train_x, train_y, test_x, test_y, epochs=epochs, shuffle=True, batch_size=batch,
+                           learning_rate=learning_rate)
+
+    print(f"Final loss: {history['losses'][-1]}, accuracy: {history['metrics'][-1]*100.:.2f}%, ", end='')
+    print(f"val_loss: {history['val_losses'][-1]}, val_accuracy: {history['val_metrics'][-1]*100.:.2f}%")

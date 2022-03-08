@@ -1,6 +1,8 @@
-import activations
-import metrics
 import numpy as np
+from common import activations
+from common import metrics
+from math import ceil
+from tqdm import tqdm
 
 rng = np.random.default_rng(12345)
 
@@ -18,13 +20,13 @@ class NeuralNetworkModel:
         for layer in range(layers):
             in_f = in_features if layer == 0 else channels
             out_f = out_features if layer == layers - 1 else channels
-            self.layers.append(rng.normal(size=[in_f + 1, out_f]))
+            self.layers.append(rng.uniform(-0.2, 0.2, size=[in_f + 1, out_f]))
 
     def forward_pass(self, inputs):
         x = inputs
         logits = [x]
-        for layer in self.layers:
-            x = np.matmul(x, layer[:-1]) + layer[-1]
+        for i in range(len(self.layers)):
+            x = np.matmul(x, self.layers[i][:-1]) + self.layers[i][-1]
             x = activations.activation_dict[self.activation][0](x)
             logits.append(x)
         return x, logits
@@ -51,6 +53,39 @@ class NeuralNetworkModel:
             layer -= gradient.mean(axis=0) * self.learning_rate
 
     def train_step(self, inputs, labels):
-        x, logits = self.forward_pass(inputs)
+        y, logits = self.forward_pass(inputs)
         self.optimizer_step(logits, labels)
-        return x
+        return y
+
+    def fit(self, inputs, labels, epochs=1, batch_size=64, shuffle=True):
+        train_x = inputs
+        train_y = labels
+
+        history = {'losses': [], 'metrics': []}
+        for epoch in range(epochs):
+            print(f'Epoch {epoch}:')
+
+            if shuffle:
+                permutation = rng.permutation(len(labels))
+                train_x = train_x[permutation]
+                train_y = train_y[permutation]
+
+            loss = []
+            metric = []
+            for batch in tqdm(range(ceil(len(inputs) / batch_size))):
+                batch_x = train_x[batch*batch_size:(batch+1)*batch_size]
+                batch_y = train_y[batch*batch_size:(batch+1)*batch_size]
+                batch_y_pred = self.train_step(batch_x, batch_y)
+                loss.append(metrics.mse(batch_y, batch_y_pred))
+                metric.append(metrics.categorical_acc(batch_y, batch_y_pred))
+
+            loss = np.concatenate(loss).mean()
+            metric = np.array(metric).sum() / len(inputs)
+
+            print(f'Loss: {loss}, Metric: {metric}')
+
+            history['losses'].append(loss)
+            history['metrics'].append(metric)
+            self.learning_rate *= 0.8
+
+        return history

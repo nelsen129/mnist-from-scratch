@@ -7,4 +7,5 @@ TODO:
 - [x] Base model
 - [x] Backpropagation
 - [x] Training loop
-- [ ] Finetuning
+- [x] Finetuning
+- [ ] Cleanup code

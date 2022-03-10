@@ -4,6 +4,7 @@ from common import metrics
 from math import ceil
 from tqdm import tqdm
 
+# RNG with seed for all randomization of weights, biases, and batches.
 rng = np.random.default_rng(12345)
 
 
@@ -15,51 +16,65 @@ class NeuralNetworkModel:
         self.channels = channels
         self.activation = activation
 
+        # Initialize learning rate here, but will be set in self.fit()
+        self.learning_rate = 1e-3
+
         self.layers = []
         for layer in range(layers):
             in_f = in_features if layer == 0 else channels
             out_f = out_features if layer == layers - 1 else channels
             self.layers.append(rng.uniform(-0.2, 0.2, size=[in_f + 1, out_f]))
 
+    # Predict a single forward pass of batch. Returns the output of the last layer and the layer_logits containing the
+    #   predictions for every layer.
+    # layer_logits: list of length self.layers+1. Each item in the list is a sublist of [xz, xa], or the outputs
+    #   before and after activation for that layer, respectively. Used for backpropagation.
     def forward_pass(self, inputs):
-        x = inputs
-        logits = [x]
+        xa = inputs
+        layer_logits = [[0., xa]]
         for i in range(len(self.layers)):
-            x = np.matmul(x, self.layers[i][:-1]) + self.layers[i][-1]
-            x = activations.activation_dict[self.activation][0](x)
-            logits.append(x)
-        return x, logits
+            xz = np.matmul(xa, self.layers[i][:-1]) + self.layers[i][-1]
+            xa = activations.activation_dict[self.activation][0](xz)
+            layer_logits.append([xz, xa])
+        return xa, layer_logits
 
+    # Calculate gradient vector for a series of logits and labels.
     def _get_gradient(self, logits, labels):
-        pred = logits[-1]
+        a = logits[-1][0]
         true = labels
-        d_a = metrics.d_mse(true, pred)
+        d_a = metrics.d_mse(true, a)
         gradient_vector = []
         for i in range(-1, -len(self.layers) - 1, -1):
             layer = self.layers[i]
-            pred_i = logits[i-1]
-            z = np.matmul(pred_i, layer[:-1]) + layer[-1]
+            a = logits[i-1][1]
+            z = logits[i][0]
             d_z = activations.activation_dict[self.activation][1](z)
-            d_w = (d_a * d_z)[:, np.newaxis, :] * pred_i[:, :, np.newaxis]
+            d_w = (d_a * d_z)[:, np.newaxis, :] * a[:, :, np.newaxis]
             d_b = d_a * d_z
-            gradient_vector.insert(0, np.concatenate([d_w, d_b[:, np.newaxis, :]], axis=-2))
+            gradient_vector.insert(0, np.concatenate([d_w, d_b[:, np.newaxis, :]], axis=-2).mean(axis=0))
             d_a = np.matmul(layer[:-1], (d_a * d_z)[:, :, np.newaxis])[:, :, 0]
         return gradient_vector
 
+    # Optimizer step. Compute gradient vector, and then adjust the weights and biases according to it. Standard
+    #   stochastic gradient descent.
     def _optimizer_step(self, logits, labels):
         gv = self._get_gradient(logits, labels)
         for layer, gradient in zip(self.layers, gv):
-            layer -= gradient.mean(axis=0) * self.learning_rate
+            layer -= gradient * self.learning_rate
 
+    # Train step. Forward pass and optimizer step.
     def _train_step(self, inputs, labels):
         y, logits = self.forward_pass(inputs)
         self._optimizer_step(logits, labels)
         return y
 
+    # Test step. Forward pass only
     def _test_step(self, inputs):
-        y, logits = self.forward_pass(inputs)
+        y, _ = self.forward_pass(inputs)
         return y
 
+    # Fit model to input data. Similar in use to TensorFlow with Keras's model.fit(). Returns a history dict containing
+    #   the losses and metrics for both training and validation for every epoch.
     def fit(self, inputs, labels, test_inputs, test_labels, epochs=1, batch_size=64, shuffle=True, learning_rate=6e-1):
         train_x = inputs
         train_y = labels
